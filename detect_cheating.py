@@ -2,13 +2,13 @@ import cv2
 from ultralytics import YOLO
 
 # Load the YOLO model
-model = YOLO('yolov8n.pt')  # Using YOLOv8n for faster detection
+model = YOLO('yolov8n.pt')  # Try "yolov8s.pt" for better accuracy
 
-# Allowed classes (we only want to detect these)
-allowed_classes = ["cell phone", "book", "laptop"]  # 'book' can be a proxy for chits
+# Allowed classes (only detecting mobile phones, books as chits, laptops)
+allowed_classes = ["cell phone", "book", "laptop"]  # 'book' acts as a chit proxy
 
-# Load the video file or use webcam
-video_path = "test-video.mp4"  # Change this to 0 for a webcam
+# Load the video file
+video_path = "test-video.mp4"  # Change this to 0 for webcam
 cap = cv2.VideoCapture(video_path)
 
 # Get video properties
@@ -26,30 +26,23 @@ while cap.isOpened():
     if not ret:
         break
 
-    # Run YOLO on the current frame
-    results = model(frame)
+    # ✅ FIXED: Pass the frame instead of the video path
+    results = model.predict(frame, conf=0.25)  
 
-    # Get detections and filter them
-    filtered_boxes = []
+    # Process the detections
     for result in results:
         for box in result.boxes:
-            class_id = int(box.cls[0])
-            class_name = result.names[class_id]  # Get object name
-            
-            if class_name in allowed_classes:  # Only keep mobile phones & chits
-                filtered_boxes.append(box)
+            class_id = int(box.cls.item())  # ✅ FIXED: Correctly extract class index
+            class_name = model.names[class_id]  # ✅ FIXED: Properly retrieve class name
 
-    # Draw filtered detections on frame
-    for box in filtered_boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0])  # Get bounding box coordinates
-        confidence = float(box.conf[0])  # Confidence score
-        class_id = int(box.cls[0])
-        class_name = result.names[class_id]  # Get class name
-        
-        # Draw bounding box
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(frame, f"{class_name} ({confidence:.2f})", (x1, y1 - 10), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            if class_name in allowed_classes:  # Only keep cheating-related objects
+                x1, y1, x2, y2 = map(int, box.xyxy[0])  # Get bounding box coordinates
+                confidence = float(box.conf[0])  # Confidence score
+
+                # Draw bounding box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"{class_name} ({confidence:.2f})", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
     # Show the filtered detections
     cv2.imshow("Filtered Cheating Detection", frame)
